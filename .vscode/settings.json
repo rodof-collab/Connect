@@ -1,0 +1,38 @@
+{
+  // подхват .env в терминалах (твоё текущее)
+  "python.terminal.useEnvFile": true,
+
+  // Pylance видел пакет из src/ даже до pip install -e .
+  "python.analysis.extraPaths": ["${workspaceFolder}/src"],
+
+  // тесты прямо из редактора
+  "python.testing.pytestEnabled": true,
+  "python.testing.pytestArgs": ["tests"],
+
+  // явная дорога к .env (это и так дефолт, но пусть будет явно)
+  "python.envFile": "${workspaceFolder}/.env",
+
+  // гигиена: у всей команды одинаковые концы строк и файлы
+  "files.eol": "\n",
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+  "editor.formatOnSave": true,
+
+  // ruff как форматтер и автофиксы при сохранении
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.ruff": "explicit",
+      "source.organizeImports.ruff": "explicit"
+    }
+  },
+
+  // не мельтешить мусором в дереве и поиске
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/.pytest_cache": true
+  },
+  "search.exclude": {
+    "**/.venv": true
+  }
+}
