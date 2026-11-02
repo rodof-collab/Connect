@@ -21,7 +21,7 @@ Telegram-бот + Mini App + админ-панель на одном FastAPI-б�
 
 **Данные**
 - PostgreSQL 17
-- SQLAlchemy 2.0 async + asyncpg
+- SQLAlchemy 2.0 async + psycopg (v3) (один драйвер на оба режима: async в приложении, sync в Alembic)
 - Alembic (миграции)
 - Redis 7 (FSM бота + кэш)
 
@@ -84,7 +84,7 @@ Connect/
    ```
 3. **Скопировать `.env.example` → `.env` и заполнить:**
    ```dotenv
-   DATABASE_URL=postgresql+asyncpg://connect:connect@localhost:5432/connect
+   DATABASE_URL=postgresql+psycopg://connect:connect@localhost:5432/connect
    REDIS_URL=redis://localhost:6379/0
    BOT_TOKEN=<токен из @BotFather>
    ADMIN_IDS=123456789,987654321
