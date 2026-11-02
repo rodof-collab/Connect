@@ -11,10 +11,31 @@ Telegram-бот + Mini App + админ-панель на одном FastAPI-б�
 - Взаимный интерес → **match** → открываются контакты.
 
 ## Стек
-Python 3.12+, FastAPI, aiogram 3 (RedisStorage), SQLAlchemy 2.0 async + asyncpg,
-Alembic, PostgreSQL 17, Redis 7, Pydantic v2 + pydantic-settings,
-pytest + pytest-asyncio + httpx, ruff + pre-commit, GitHub Actions → Render,
-Vite + @telegram-apps/sdk, Chart.js.
+
+**Бэкенд и API**
+- Python 3.12+
+- FastAPI (OpenAPI на `/docs`)
+- uvicorn
+- aiogram 3 + RedisStorage (FSM)
+- Pydantic v2 + pydantic-settings
+
+**Данные**
+- PostgreSQL 17
+- SQLAlchemy 2.0 async + asyncpg
+- Alembic (миграции)
+- Redis 7 (FSM бота + кэш)
+
+**Фронтенд**
+- Vite
+- @telegram-apps/sdk (Mini App)
+- Chart.js (админка)
+- vanilla JS
+
+**DevOps и тесты**
+- Docker + Docker Compose
+- pytest + pytest-asyncio + httpx
+- ruff (lint + format) + pre-commit
+- GitHub Actions (CI) → Render (CD)
 
 ## Архитектура
 Слои: **интерфейсы** (bot / miniapp / admin_ui) → **services** → **repositories** → **PostgreSQL**.
@@ -46,23 +67,50 @@ Connect/
 ```
 
 ## Быстрый старт (локально)
-1. Скопируй `.env.example` → `.env` и заполни:
+
+> ⚠️ Пока в репо нет `pyproject.toml`, `alembic.ini` и `docker-compose.yml` — шаги 2, 3 и 5 **не пройдут**. Они описывают **целевой** запуск; по мере добавления файлов (см. issue) — заработают.
+
+1. **Клонировать репо и создать venv:**
+   ```bash
+   git clone https://github.com/rodof-collab/Connect
+   cd Connect
+   python3.12 -m venv .venv
+   source .venv/bin/activate    # Windows: .venv\Scripts\activate
    ```
+2. **Установить пакет в editable-режиме с dev-зависимостями:**
+   ```bash
+   pip install -e ".[dev]"
+   # ⚠️ требует pyproject.toml с [project.optional-dependencies] dev
+   ```
+3. **Скопировать `.env.example` → `.env` и заполнить:**
+   ```dotenv
    DATABASE_URL=postgresql+asyncpg://connect:connect@localhost:5432/connect
    REDIS_URL=redis://localhost:6379/0
    BOT_TOKEN=<токен из @BotFather>
    ADMIN_IDS=123456789,987654321
+   # ADMIN_IDS парсится как list[int] через pydantic-валидатор в core/config.py
    ```
-2. Подними Postgres и Redis:
+4. **Поднять Postgres и Redis** (⚠️ требует `docker-compose.yml` с healthcheck):
    ```bash
-   docker compose up -d postgres redis
+   docker compose up -d --wait postgres redis
    ```
-3. Примени миграции и запусти API:
+   `--wait` ждёт `healthy`-статуса контейнеров, чтобы `alembic upgrade` не упал с `connection refused`.
+5. **Применить миграции:**
    ```bash
    alembic upgrade head
-   uvicorn connect.main:app --reload --app-dir src
+   # ⚠️ требует alembic.ini в корне (script_location = src/connect/migrations)
    ```
-4. Открой автодокументацию: http://localhost:8000/docs
+6. **Собрать Mini App** (⚠️ требует `miniapp/package.json`):
+   ```bash
+   cd miniapp && npm ci && npm run build && cd ..
+   ```
+   Сборка кладётся в `miniapp/dist/` и раздаётся FastAPI как статика.
+7. **Запустить API:**
+   ```bash
+   uvicorn connect.main:app --reload --app-dir src
+   # ⚠️ требует app = FastAPI(...) в main.py
+   ```
+8. Открыть http://localhost:8000/docs
 
 ## Команды разработчика
 ```bash
