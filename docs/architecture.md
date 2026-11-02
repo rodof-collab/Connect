@@ -4,25 +4,33 @@
 
 ```mermaid
 flowchart LR
-    subgraph Clients[Интерфейсы]
-        BOT[Telegram Bot<br/>aiogram 3]
-        MA[Mini App<br/>Vite + @telegram-apps/sdk]
-        ADM[Admin UI<br/>HTML + Chart.js]
+    subgraph Clients ["Интерфейсы"]
+        BOT["Telegram Bot
+aiogram 3"]
+        MA["Mini App
+Vite + @telegram-apps/sdk"]
+        ADM["Admin UI
+HTML + Chart.js"]
     end
 
-    subgraph API[FastAPI]
-        R1[Bot webhook / API]
-        R2[User API<br/>initData HMAC]
-        R3[Admin API<br/>ADMIN_IDS]
+    subgraph API ["FastAPI"]
+        R1["Bot webhook / API"]
+        R2["User API
+initData HMAC"]
+        R3["Admin API
+ADMIN_IDS"]
     end
 
-    subgraph Logic[Бизнес-слой]
-        S[services<br/>мэтчинг, приглашения]
-        REPO[repositories<br/>AsyncSession]
+    subgraph Logic ["Бизнес-слой"]
+        S["services
+мэтчинг, приглашения"]
+        REPO["repositories
+AsyncSession"]
     end
 
-    PG[(PostgreSQL 17)]
-    RD[(Redis 7<br/>FSM + cache)]
+    PG[("PostgreSQL 17")]
+    RD[("Redis 7
+FSM + cache")]
 
     BOT --> R1
     MA  --> R2
