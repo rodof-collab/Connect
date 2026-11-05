@@ -73,6 +73,7 @@ erDiagram
 | id | BIGINT | PK | |
 | name | VARCHAR(100) | NOT NULL | |
 | description | TEXT | NULL | |
+| max_members | INT | NULL | вместимость команды; NULL = без лимита; проверяется сервисом при подтверждении вступления |
 | owner_id | BIGINT | NOT NULL, FK users ON DELETE RESTRICT | удаление владельца запрещено до передачи/деактивации |
 | is_active | BOOLEAN | NOT NULL, DEFAULT TRUE | |
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
@@ -83,9 +84,15 @@ erDiagram
 | id | BIGINT | PK | |
 | user_id | BIGINT | NOT NULL, FK users ON DELETE CASCADE | |
 | team_id | BIGINT | NOT NULL, FK teams ON DELETE CASCADE | |
-| role | VARCHAR(20) | NOT NULL, DEFAULT 'member', CHECK IN ('owner','member','trial') | |
+| role | VARCHAR(20) | NOT NULL, DEFAULT 'member', CHECK IN ('owner','member','candidate') | candidate = заявка на вступление, ждёт решения владельца |
 | joined_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
 | left_at | TIMESTAMPTZ | NULL | NULL = активное участие |
+
+Жизненный цикл строк: `candidate` (заявка ждёт решения владельца) → `member`
+(подтверждено). Отклонение заявки, кик и самостоятельный выход закрывают строку
+одинаково: `left_at = now()`; тип закрытой строки читается по `role`.
+Partial UNIQUE `(user_id, team_id) WHERE left_at IS NULL` распространяется и на
+candidate: незакрытых заявок/участий у пары «юзер–команда» может быть только одна.
 
 Ограничения: `UNIQUE (user_id, team_id) WHERE left_at IS NULL` (partial index — одно активное участие в команде); индексы на user_id, team_id.
 
@@ -150,19 +157,23 @@ erDiagram
 
 | № | Правило | Где обеспечивается |
 |---|---|---|
-| BR-1 | Не более 3 активных участий в командах у пользователя | сервис TeamService.join, проверка в транзакции |
+| BR-1 | Не более `max_active_memberships` активных участий у пользователя (параметр конфига, по умолчанию 10, `None` = без лимита). Активное = `left_at IS NULL AND role IN ('owner','member')`; candidate не считается. Проверяется в момент подтверждения вступления (candidate → member) | конфиг `core/config.py` + сервис `TeamService.approve_join` |
 | BR-2 | Одно активное участие в одной команде | partial UNIQUE в БД |
 | BR-3 | Мэтч человек↔команда создаётся атомарно при наличии application + invitation | сервис, одна транзакция |
 | BR-4 | Соц-мэтч создаётся атомарно при взаимных social_likes; пара нормализована (user1 < user2) | сервис, одна транзакция |
 | BR-5 | Контакты (profile.contact) выдаются только при активном мэтче пары | сервис MatchService |
-| BR-6 | Вступление в команду после мэтча создаёт team_members (role='trial' или 'member') с проверкой BR-1 | сервис |
+| BR-6 | Кнопка «вступить» доступна только при активном мэтче и создаёт `team_members(role='candidate')`; подтверждение владельцем переводит в `role='member'` с проверкой BR-1 (и BR-9), отклонение закрывает строку через `left_at` | сервисы `MatchService` / `TeamService` |
 | BR-7 | Выгрузки/аналитика для HR только по строкам с data_consent = TRUE | сервис аналитики |
 | BR-8 | Забаненный пользователь не создаёт interests/likes/matches | сервис |
+| BR-9 | Если у команды задан `max_members`, число активных участников не может его превышать; проверяется при подтверждении вступления | сервис `TeamService.approve_join` |
 
 ## 6. Основные потоки
 
-1. **Seeker:** профиль → просмотр команд → `interests(kind='application')` → владелец жмёт приглашение → `matches` → контакты открыты → кнопка «вступить» → `team_members`.
-2. **Recruiter:** создание `teams` → `interests(kind='invitation')` на сикера → сикер откликается → `matches` → далее как выше.
+1. **Seeker:** профиль → просмотр команд → `interests(kind='application')` → владелец
+   жмёт приглашение → `matches` (контакты открыты, общение в TG) → кнопка «вступить» →
+   `team_members(role='candidate')` → владелец подтверждает → `role='member'`
+   (проверки BR-1, BR-9) ИЛИ отклоняет → строка закрывается через `left_at`.
+2. **Recruiter:** создание `teams` (опционально `max_members`) → `interests(kind='invitation')` на сикера → сикер откликается → `matches` → далее шаги «вступить → candidate → подтверждение» из потока 1.
 3. **Social:** `social_likes` → взаимный лайк → `social_matches` → контакты открыты.
 4. **Admin:** действие модерации + строка `admin_logs` в той же транзакции.
 
@@ -176,6 +187,18 @@ erDiagram
 - **D-6. VARCHAR + CHECK вместо PG ENUM.** Добавление значения перечисления — обычная миграция без пересоздания типа.
 - **D-7. data_consent в profiles с дефолтом FALSE.** Юридическая база будущей монетизации; согласия задним числом не собирают.
 - **D-8. Источник истины схемы — модели + миграции Alembic.** Этот документ и диаграмма обновляются в том же PR, что и миграция; ручных SQL-правок общей БД нет.
+- **D-9. Двухшаговое вступление через candidate вместо trial.** Контакты открываются
+  в момент мэтча, общение происходит в TG; вступление — только через подтверждение
+  владельцем. trial отклонён как избыточный: защита от неадекватных участников =
+  кандидат-стадия + кик через left_at; возврат trial = добавление значения в CHECK,
+  одна миграция.
+- **D-10. Лимит команд — параметр конфига `max_active_memberships`** (дефолт 10,
+  `None` = выключен), проверяется при подтверждении. Это продуктовый параметр, а не
+  ограничение схемы: меняется без миграций. Целостность «одно активное участие в
+  одной команде» по-прежнему гарантирует partial UNIQUE в БД.
+- **D-11. Вместимость команды `teams.max_members`.** Осмысленный лимит для игровых
+  скводов; задаётся владельцем при создании, проверяется сервисом при подтверждении.
+  NULL = без лимита.
 
 ## 8. Политика изменений схемы
 
