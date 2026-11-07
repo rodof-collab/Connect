@@ -10,7 +10,12 @@ description = "Telegram-бот поиска команды: Seeker/Recruiter/Soc
 readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"
-authors = [{ name = "rodof-collab team" }]
+authors = [
+    { name = "Дворачек Никита (@rodof-collab)", email = "rodofatos71@gmail.com" },
+    { name = "Лобецкая Евгения (@lioxoo)", email = "lobetskayazhenya8@gmail.com" },
+    { name = "Шаланин Лев (@levasalanin-source)", email = "Levasalanin@gmail.com" },
+    { name = "Аллик Вячеслав (@SLAVakone)", email = "v.allik@mail.ru" }
+]
 
 dependencies = [
     # --- бот ---
