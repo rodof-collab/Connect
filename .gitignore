@@ -15,3 +15,5 @@ dist/
 .ruff_cache/
 .pytest_cache/
 .coverage
+docker-compose.override.yaml
+docker-compose.override.yml
