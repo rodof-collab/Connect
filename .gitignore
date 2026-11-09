@@ -9,5 +9,11 @@ __pycache__/
 !.vscode/launch.json
 !.vscode/extensions.json
 !.vscode/*.code-snippets
+*.egg-info/
+build/
+dist/
+.ruff_cache/
+.pytest_cache/
+.coverage
 docker-compose.override.yaml
 docker-compose.override.yml
