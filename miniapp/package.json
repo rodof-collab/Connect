@@ -12,6 +12,6 @@
     "vite": "^8.3.5"
   },
   "dependencies": {
-    "@tma.js/sdk": "^3.3.0"
+    "@telegram-apps/sdk": "^3.11.8"
   }
 }

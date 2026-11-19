@@ -1,49 +1,28 @@
+﻿import { retrieveLaunchParams, init } from '@telegram-apps/sdk';
 import './style.css';
 
 const app = document.getElementById('app');
 
-// Проверяем, открыто ли приложение внутри Telegram
-const isTelegram = window.location.href.includes('t.me') || 
-                   window.location.href.includes('web.app');
-
-let initDataRaw = 'initData отсутствует (открыто вне Telegram)';
-let mockUser = null;
-
-if (!isTelegram) {
-  // Локальная разработка — создаём мок
-  console.warn('🔧 Локальная разработка: используем мок-данные');
-  mockUser = {
-    id: 123456789,
-    first_name: 'Test',
-    last_name: 'User',
-    username: 'testuser',
-    language_code: 'ru',
-  };
-  initDataRaw = 'user=' + encodeURIComponent(JSON.stringify(mockUser)) + 
-                '&auth_date=' + Math.floor(Date.now() / 1000) + 
-                '&hash=mock_hash_for_local_development';
-} else {
-  // В Telegram — пробуем получить реальные данные
-  try {
-    import('@tma.js/sdk').then(({ retrieveLaunchParams }) => {
-      const lp = retrieveLaunchParams();
-      initDataRaw = lp.initDataRaw || 'initData пуст';
-      renderApp(initDataRaw);
-    });
-  } catch (e) {
-    console.error('Ошибка получения initData:', e);
-  }
-}
-
-function renderApp(data) {
+function renderApp(initDataRaw, isMock = false) {
+  if (!app) return;
   app.innerHTML = `
     <h1>Connect Mini App</h1>
     <div class="card">
       <h3>initDataRaw (для авторизации на бэкенде)</h3>
-      <pre>${data}</pre>
+      <pre>${initDataRaw}</pre>
     </div>
-    ${mockUser ? '<p style="color: orange; margin-top: 16px;">⚠️ Мок-режим (локальная разработка)</p>' : ''}
+    ${isMock ? '<p style="color: #f59e0b; margin-top: 16px; font-weight: 500;">⚠️ Мок-режим (локальная разработка)</p>' : ''}
   `;
 }
 
-renderApp(initDataRaw);
+try {
+  const launchParams = retrieveLaunchParams();
+  const sdk = init(launchParams);
+  sdk.mount();  // mount вызывается как метод объекта sdk
+  const rawData = launchParams.initDataRaw || 'initData пуст';
+  renderApp(rawData, false);
+} catch (error) {
+  console.warn('🔧 Локальная разработка: используем мок-данные.', error.message);
+  const mockInitData = 'user=%7B%22id%22%3A123456789%2C%22first_name%22%3A%22Test%22%2C%22username%22%3A%22testuser%22%7D&auth_date=1700000000&hash=mock_hash_for_local_development';
+  renderApp(mockInitData, true);
+}
