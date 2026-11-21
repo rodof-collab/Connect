@@ -1,8 +1,10 @@
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import (
     BigInteger,
     CheckConstraint,
+    DateTime,
     ForeignKey,
     Index,
     String,
@@ -25,11 +27,11 @@ class AdminLog(Base):
     action: Mapped[str] = mapped_column(String(50), nullable=False)
     target_type: Mapped[str] = mapped_column(String(20), nullable=False)
     target_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    details: Mapped[dict] = mapped_column(
+    details: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default=text("'{}'::jsonb")
     )
     created_at: Mapped[datetime] = mapped_column(
-        nullable=False, server_default=func.now()
+        DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
     __table_args__ = (

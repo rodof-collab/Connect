@@ -1,8 +1,8 @@
-"""init schema
+"""init schema rev2
 
-Revision ID: 6efcc59edd5d
+Revision ID: 2ed13e8e90c7
 Revises: 
-Create Date: 2026-11-08 17:54:06.026272
+Create Date: 2026-11-21 20:28:40.109528
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '6efcc59edd5d'
+revision: str = '2ed13e8e90c7'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -25,9 +25,12 @@ def upgrade() -> None:
     sa.Column('id', sa.BigInteger(), nullable=False),
     sa.Column('tg_id', sa.BigInteger(), nullable=False),
     sa.Column('username', sa.String(length=64), nullable=True),
+    sa.Column('mode', sa.String(length=20), nullable=True),
     sa.Column('role', sa.String(length=20), server_default=sa.text("'user'"), nullable=False),
     sa.Column('is_banned', sa.Boolean(), server_default=sa.text('false'), nullable=False),
-    sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('is_registered', sa.Boolean(), server_default=sa.text('false'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.CheckConstraint("mode IN ('seeker','recruiter','social')", name='ck_users_mode'),
     sa.CheckConstraint("role IN ('user','moderator','admin')", name='ck_users_role'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('tg_id')
@@ -39,22 +42,41 @@ def upgrade() -> None:
     sa.Column('target_type', sa.String(length=20), nullable=False),
     sa.Column('target_id', sa.BigInteger(), nullable=False),
     sa.Column('details', postgresql.JSONB(astext_type=sa.Text()), server_default=sa.text("'{}'::jsonb"), nullable=False),
-    sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.CheckConstraint("target_type IN ('user','team','match','social_match','team_member')", name='ck_admin_logs_target_type'),
     sa.ForeignKeyConstraint(['admin_id'], ['users.id'], ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index('ix_admin_logs_target', 'admin_logs', ['target_type', 'target_id'], unique=False)
+    op.create_table('blocked_users',
+    sa.Column('id', sa.BigInteger(), nullable=False),
+    sa.Column('user_id', sa.BigInteger(), nullable=False),
+    sa.Column('blocked_user_id', sa.BigInteger(), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.CheckConstraint('user_id <> blocked_user_id', name='ck_blocked_users_no_self'),
+    sa.ForeignKeyConstraint(['blocked_user_id'], ['users.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('user_id', 'blocked_user_id', name='uq_blocked_users_pair')
+    )
+    op.create_index(op.f('ix_blocked_users_blocked_user_id'), 'blocked_users', ['blocked_user_id'], unique=False)
+    op.create_index(op.f('ix_blocked_users_user_id'), 'blocked_users', ['user_id'], unique=False)
     op.create_table('profiles',
     sa.Column('id', sa.BigInteger(), nullable=False),
     sa.Column('user_id', sa.BigInteger(), nullable=False),
     sa.Column('bio', sa.Text(), nullable=True),
+    sa.Column('full_name', sa.String(length=120), nullable=True),
+    sa.Column('course', sa.Integer(), nullable=True),
+    sa.Column('faculty', sa.String(length=120), nullable=True),
     sa.Column('game', sa.String(length=64), nullable=True),
     sa.Column('skill_level', sa.String(length=20), nullable=True),
+    sa.Column('skills', postgresql.JSONB(astext_type=sa.Text()), server_default=sa.text("'[]'::jsonb"), nullable=False),
+    sa.Column('interests', postgresql.JSONB(astext_type=sa.Text()), server_default=sa.text("'[]'::jsonb"), nullable=False),
     sa.Column('privacy', sa.String(length=20), server_default=sa.text("'public'"), nullable=False),
     sa.Column('contact', sa.String(length=128), nullable=True),
+    sa.Column('photo_file_id', sa.String(length=256), nullable=True),
     sa.Column('data_consent', sa.Boolean(), server_default=sa.text('false'), nullable=False),
-    sa.Column('updated_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.CheckConstraint("privacy IN ('public','friends_only','private')", name='ck_profiles_privacy'),
     sa.CheckConstraint("skill_level IN ('beginner','middle','advanced','pro')", name='ck_profiles_skill'),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
@@ -65,25 +87,29 @@ def upgrade() -> None:
     sa.Column('id', sa.BigInteger(), nullable=False),
     sa.Column('from_user_id', sa.BigInteger(), nullable=False),
     sa.Column('to_user_id', sa.BigInteger(), nullable=False),
-    sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.CheckConstraint('from_user_id <> to_user_id', name='ck_social_likes_no_self'),
     sa.ForeignKeyConstraint(['from_user_id'], ['users.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['to_user_id'], ['users.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('from_user_id', 'to_user_id', name='uq_social_likes_pair')
     )
+    op.create_index(op.f('ix_social_likes_from_user_id'), 'social_likes', ['from_user_id'], unique=False)
+    op.create_index(op.f('ix_social_likes_to_user_id'), 'social_likes', ['to_user_id'], unique=False)
     op.create_table('social_matches',
     sa.Column('id', sa.BigInteger(), nullable=False),
     sa.Column('user1_id', sa.BigInteger(), nullable=False),
     sa.Column('user2_id', sa.BigInteger(), nullable=False),
     sa.Column('status', sa.String(length=20), server_default=sa.text("'active'"), nullable=False),
-    sa.Column('matched_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('matched_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.CheckConstraint('user1_id < user2_id', name='ck_social_matches_order'),
     sa.ForeignKeyConstraint(['user1_id'], ['users.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['user2_id'], ['users.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('user1_id', 'user2_id', name='uq_social_matches_pair')
     )
+    op.create_index(op.f('ix_social_matches_user1_id'), 'social_matches', ['user1_id'], unique=False)
+    op.create_index(op.f('ix_social_matches_user2_id'), 'social_matches', ['user2_id'], unique=False)
     op.create_table('teams',
     sa.Column('id', sa.BigInteger(), nullable=False),
     sa.Column('name', sa.String(length=100), nullable=False),
@@ -91,17 +117,18 @@ def upgrade() -> None:
     sa.Column('owner_id', sa.BigInteger(), nullable=False),
     sa.Column('max_members', sa.Integer(), nullable=True),
     sa.Column('is_active', sa.Boolean(), server_default=sa.text('true'), nullable=False),
-    sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['owner_id'], ['users.id'], ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_index(op.f('ix_teams_owner_id'), 'teams', ['owner_id'], unique=False)
     op.create_table('interests',
     sa.Column('id', sa.BigInteger(), nullable=False),
     sa.Column('user_id', sa.BigInteger(), nullable=False),
     sa.Column('team_id', sa.BigInteger(), nullable=False),
     sa.Column('kind', sa.String(length=20), nullable=False),
     sa.Column('created_by', sa.BigInteger(), nullable=False),
-    sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.CheckConstraint("kind IN ('application','invitation')", name='ck_interests_kind'),
     sa.ForeignKeyConstraint(['created_by'], ['users.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['team_id'], ['teams.id'], ondelete='CASCADE'),
@@ -109,30 +136,36 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('user_id', 'team_id', 'kind', name='uq_interests_pair_kind')
     )
+    op.create_index(op.f('ix_interests_team_id'), 'interests', ['team_id'], unique=False)
+    op.create_index(op.f('ix_interests_user_id'), 'interests', ['user_id'], unique=False)
     op.create_table('matches',
     sa.Column('id', sa.BigInteger(), nullable=False),
     sa.Column('user_id', sa.BigInteger(), nullable=False),
     sa.Column('team_id', sa.BigInteger(), nullable=False),
     sa.Column('status', sa.String(length=20), server_default=sa.text("'active'"), nullable=False),
-    sa.Column('matched_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('matched_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.CheckConstraint("status IN ('active','closed')", name='ck_matches_status'),
     sa.ForeignKeyConstraint(['team_id'], ['teams.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('user_id', 'team_id', name='uq_matches_pair')
     )
+    op.create_index(op.f('ix_matches_team_id'), 'matches', ['team_id'], unique=False)
+    op.create_index(op.f('ix_matches_user_id'), 'matches', ['user_id'], unique=False)
     op.create_table('team_members',
     sa.Column('id', sa.BigInteger(), nullable=False),
     sa.Column('user_id', sa.BigInteger(), nullable=False),
     sa.Column('team_id', sa.BigInteger(), nullable=False),
     sa.Column('role', sa.String(length=20), server_default=sa.text("'member'"), nullable=False),
-    sa.Column('joined_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
-    sa.Column('left_at', sa.DateTime(), nullable=True),
+    sa.Column('joined_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('left_at', sa.DateTime(timezone=True), nullable=True),
     sa.CheckConstraint("role IN ('owner','member','candidate')", name='ck_team_members_role'),
     sa.ForeignKeyConstraint(['team_id'], ['teams.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_index(op.f('ix_team_members_team_id'), 'team_members', ['team_id'], unique=False)
+    op.create_index(op.f('ix_team_members_user_id'), 'team_members', ['user_id'], unique=False)
     op.create_index('uq_team_members_one_active', 'team_members', ['user_id', 'team_id'], unique=True, postgresql_where=sa.text('left_at IS NULL'))
     # ### end Alembic commands ###
 
@@ -141,13 +174,27 @@ def downgrade() -> None:
     """Downgrade schema."""
     # ### commands auto generated by Alembic - please adjust! ###
     op.drop_index('uq_team_members_one_active', table_name='team_members', postgresql_where=sa.text('left_at IS NULL'))
+    op.drop_index(op.f('ix_team_members_user_id'), table_name='team_members')
+    op.drop_index(op.f('ix_team_members_team_id'), table_name='team_members')
     op.drop_table('team_members')
+    op.drop_index(op.f('ix_matches_user_id'), table_name='matches')
+    op.drop_index(op.f('ix_matches_team_id'), table_name='matches')
     op.drop_table('matches')
+    op.drop_index(op.f('ix_interests_user_id'), table_name='interests')
+    op.drop_index(op.f('ix_interests_team_id'), table_name='interests')
     op.drop_table('interests')
+    op.drop_index(op.f('ix_teams_owner_id'), table_name='teams')
     op.drop_table('teams')
+    op.drop_index(op.f('ix_social_matches_user2_id'), table_name='social_matches')
+    op.drop_index(op.f('ix_social_matches_user1_id'), table_name='social_matches')
     op.drop_table('social_matches')
+    op.drop_index(op.f('ix_social_likes_to_user_id'), table_name='social_likes')
+    op.drop_index(op.f('ix_social_likes_from_user_id'), table_name='social_likes')
     op.drop_table('social_likes')
     op.drop_table('profiles')
+    op.drop_index(op.f('ix_blocked_users_user_id'), table_name='blocked_users')
+    op.drop_index(op.f('ix_blocked_users_blocked_user_id'), table_name='blocked_users')
+    op.drop_table('blocked_users')
     op.drop_index('ix_admin_logs_target', table_name='admin_logs')
     op.drop_table('admin_logs')
     op.drop_table('users')
