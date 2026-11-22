@@ -9,16 +9,20 @@ function renderApp(initDataRaw, isMock = false) {
     <h1>Connect Mini App</h1>
     <div class="card">
       <h3>initDataRaw (для авторизации на бэкенде)</h3>
-      <pre>${initDataRaw}</pre>
+      <pre id ="init-data"></pre>
     </div>
     ${isMock ? '<p style="color: #f59e0b; margin-top: 16px; font-weight: 500;">⚠️ Мок-режим (локальная разработка)</p>' : ''}
   `;
+  const initDataElement = document.getElementById('init-data');
+  if (initDtaElement) {
+    initDataElement.textContent = initDtaRaw;
+  }
 }
 
 try {
   const launchParams = retrieveLaunchParams();
   const sdk = init(launchParams);
-  sdk.mount();  // mount вызывается как метод объекта sdk
+  sdk.mount();
   const rawData = launchParams.initDataRaw || 'initData пуст';
   renderApp(rawData, false);
 } catch (error) {
