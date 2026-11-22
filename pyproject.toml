@@ -1,0 +1,65 @@
+# ============ Сборка и метаданные проекта (PEP 517/621) ============
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "connect-bot"
+version = "0.1.0"
+description = "Telegram-бот поиска команды: Seeker/Recruiter/Social, Mini App и админка на FastAPI"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+authors = [
+    { name = "Дворачек Никита (@rodof-collab)", email = "rodofatos71@gmail.com" },
+    { name = "Лобецкая Евгения (@lioxoo)", email = "lobetskayazhenya8@gmail.com" },
+    { name = "Шаланин Лев (@levasalanin-source)", email = "Levasalanin@gmail.com" },
+    { name = "Аллик Вячеслав (@SLAVakone)", email = "v.allik@mail.ru" }
+]
+
+dependencies = [
+    # --- бот ---
+    "aiogram>=3.13",
+    # --- веб: API для Mini App и админ-панель ---
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    # --- база данных ---
+    "sqlalchemy>=2.0",
+    "psycopg[binary]>=3.1",
+    "redis>=5.0",
+    "alembic>=1.13",
+    # --- конфигурация ---
+    "pydantic-settings>=2.2",
+    "pydantic>=2.7",
+]
+
+# Зависимости для разработки: ставятся как pip install -e ".[dev]"
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",          # асинхронные тесты хендлеров бота
+    "httpx>=0.27",                   # нужен FastAPI TestClient
+    "ruff>=0.4",                     # линтер и форматтер из вашего settings.json
+    "pre-commit>=3.7"
+]
+
+# Точка входа: после установки работает команда connect-bot
+[project.scripts]
+connect-bot = "connect.main:main"
+
+# ============ Где setuptools искать пакеты ============
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# ============ Настройки инструментов ============
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]  # стиль, ошибки, сортировка импортов, апгрейды синтаксиса, баги
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
