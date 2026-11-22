@@ -13,5 +13,8 @@
   },
   "dependencies": {
     "@telegram-apps/sdk": "^3.11.8"
+  },
+  "overrides": {
+    "valibot": "^1.5.0"
   }
 }
